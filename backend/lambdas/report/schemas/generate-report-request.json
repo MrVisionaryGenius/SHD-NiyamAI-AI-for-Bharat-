@@ -1,0 +1,19 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+        "assessmentIds": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+                "type": "string",
+                "format": "uuid"
+            },
+            "description": "Array of assessment IDs to include in the report"
+        }
+    },
+    "required": [
+        "assessmentIds"
+    ],
+    "additionalProperties": false
+}

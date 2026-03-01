@@ -1,0 +1,33 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+        "responses": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+                "type": "object",
+                "properties": {
+                    "questionId": {
+                        "type": "string",
+                        "description": "ID of the security question"
+                    },
+                    "response": {
+                        "type": "string",
+                        "description": "User's response to the question"
+                    }
+                },
+                "required": [
+                    "questionId",
+                    "response"
+                ],
+                "additionalProperties": false
+            },
+            "description": "Array of security questionnaire responses"
+        }
+    },
+    "required": [
+        "responses"
+    ],
+    "additionalProperties": false
+}

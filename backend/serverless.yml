@@ -1,0 +1,642 @@
+service: niyamai-risk-checker
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: ${opt:region, 'us-east-1'}
+  stage: ${opt:stage, 'dev'}
+  memorySize: 512
+  timeout: 30
+  
+  # VPC Configuration - Deploy Lambda functions in private subnets
+  vpc:
+    securityGroupIds:
+      - Ref: LambdaSecurityGroup
+    subnetIds:
+      # Reference private subnets (must be created separately or imported)
+      # For production, replace with actual subnet IDs or use CloudFormation imports
+      - ${env:PRIVATE_SUBNET_1, 'subnet-xxxxxxxx'}
+      - ${env:PRIVATE_SUBNET_2, 'subnet-yyyyyyyy'}
+  
+  environment:
+    STAGE: ${self:provider.stage}
+    REGION: ${self:provider.region}
+    DOCUMENTS_BUCKET: ${self:custom.documentsBucket}
+    DB_HOST: ${env:DB_HOST}
+    DB_NAME: ${env:DB_NAME}
+    DB_USER: ${env:DB_USER}
+    DB_PASSWORD: ${env:DB_PASSWORD}
+    DB_SSL: 'true'
+    COGNITO_USER_POOL_ID:
+      Ref: CognitoUserPool
+    COGNITO_CLIENT_ID:
+      Ref: CognitoUserPoolClient
+    AI_API_KEY: ${env:AI_API_KEY}
+  
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - s3:PutObject
+            - s3:GetObject
+            - s3:DeleteObject
+            - s3:ListBucket
+          Resource: 
+            - arn:aws:s3:::${self:custom.documentsBucket}
+            - arn:aws:s3:::${self:custom.documentsBucket}/*
+        - Effect: Allow
+          Action:
+            - textract:StartDocumentTextDetection
+            - textract:GetDocumentTextDetection
+          Resource: '*'
+        - Effect: Allow
+          Action:
+            - cognito-idp:AdminGetUser
+            - cognito-idp:AdminInitiateAuth
+            - cognito-idp:DeleteUser
+          Resource: '*'
+        - Effect: Allow
+          Action:
+            - ec2:CreateNetworkInterface
+            - ec2:DescribeNetworkInterfaces
+            - ec2:DeleteNetworkInterface
+          Resource: '*'
+
+custom:
+  documentsBucket: niyamai-documents-${self:provider.stage}
+
+functions:
+  auth:
+    handler: lambdas/auth/handler.handler
+    events:
+      - http:
+          path: /auth/login
+          method: post
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - Authorization
+            allowCredentials: false
+          request:
+            schemas:
+              application/json:
+                schema: ${file(lambdas/auth/schemas/login-request.json)}
+                name: LoginRequest
+      - http:
+          path: /auth/register
+          method: post
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - Authorization
+            allowCredentials: false
+          request:
+            schemas:
+              application/json:
+                schema: ${file(lambdas/auth/schemas/register-request.json)}
+                name: RegisterRequest
+      - http:
+          path: /auth/account
+          method: delete
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - Authorization
+            allowCredentials: false
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId:
+              Ref: ApiGatewayAuthorizer
+
+  upload:
+    handler: lambdas/upload/handler.handler
+    events:
+      - http:
+          path: /documents/upload
+          method: post
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - Authorization
+            allowCredentials: false
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId:
+              Ref: ApiGatewayAuthorizer
+          request:
+            schemas:
+              application/json:
+                schema: ${file(lambdas/upload/schemas/upload-request.json)}
+                name: UploadRequest
+
+  processOCR:
+    handler: lambdas/upload/handler.processOCR
+    timeout: 300
+    events:
+      - http:
+          path: /documents/process-ocr
+          method: post
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - Authorization
+            allowCredentials: false
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId:
+              Ref: ApiGatewayAuthorizer
+          request:
+            schemas:
+              application/json:
+                schema: ${file(lambdas/upload/schemas/process-ocr-request.json)}
+                name: ProcessOCRRequest
+      - s3:
+          bucket: ${self:custom.documentsBucket}
+          event: s3:ObjectCreated:*
+          existing: true
+
+  analysis:
+    handler: lambdas/analysis/handler.handler
+    events:
+      - http:
+          path: /analyze/contract
+          method: post
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - Authorization
+            allowCredentials: false
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId:
+              Ref: ApiGatewayAuthorizer
+          request:
+            schemas:
+              application/json:
+                schema: ${file(lambdas/analysis/schemas/analyze-request.json)}
+                name: AnalyzeContractRequest
+      - http:
+          path: /analyze/invoice
+          method: post
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - Authorization
+            allowCredentials: false
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId:
+              Ref: ApiGatewayAuthorizer
+          request:
+            schemas:
+              application/json:
+                schema: ${file(lambdas/analysis/schemas/analyze-request.json)}
+                name: AnalyzeInvoiceRequest
+      - http:
+          path: /analyze/security
+          method: post
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - Authorization
+            allowCredentials: false
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId:
+              Ref: ApiGatewayAuthorizer
+          request:
+            schemas:
+              application/json:
+                schema: ${file(lambdas/analysis/schemas/security-request.json)}
+                name: SecurityQuestionnaireRequest
+
+  report:
+    handler: lambdas/report/handler.handler
+    events:
+      - http:
+          path: /dashboard
+          method: get
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - Authorization
+            allowCredentials: false
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId:
+              Ref: ApiGatewayAuthorizer
+      - http:
+          path: /reports/generate
+          method: post
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - Authorization
+            allowCredentials: false
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId:
+              Ref: ApiGatewayAuthorizer
+          request:
+            schemas:
+              application/json:
+                schema: ${file(lambdas/report/schemas/generate-report-request.json)}
+                name: GenerateReportRequest
+
+resources:
+  Resources:
+    # VPC Security Group for Lambda functions
+    LambdaSecurityGroup:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        GroupName: niyamai-lambda-sg-${self:provider.stage}
+        GroupDescription: Security group for NiyamAI Lambda functions
+        VpcId: ${env:VPC_ID, 'vpc-xxxxxxxx'}
+        SecurityGroupEgress:
+          # Allow HTTPS outbound for API calls (AI service, Cognito, etc.)
+          - IpProtocol: tcp
+            FromPort: 443
+            ToPort: 443
+            CidrIp: 0.0.0.0/0
+          # Allow PostgreSQL outbound to RDS
+          - IpProtocol: tcp
+            FromPort: 5432
+            ToPort: 5432
+            CidrIp: 10.0.0.0/16
+        Tags:
+          - Key: Name
+            Value: niyamai-lambda-sg-${self:provider.stage}
+          - Key: Environment
+            Value: ${self:provider.stage}
+
+    # Database Security Group
+    DatabaseSecurityGroup:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        GroupName: niyamai-db-sg-${self:provider.stage}
+        GroupDescription: Security group for NiyamAI RDS database
+        VpcId: ${env:VPC_ID, 'vpc-xxxxxxxx'}
+        SecurityGroupIngress:
+          # Allow PostgreSQL from Lambda security group only
+          - IpProtocol: tcp
+            FromPort: 5432
+            ToPort: 5432
+            SourceSecurityGroupId:
+              Ref: LambdaSecurityGroup
+        Tags:
+          - Key: Name
+            Value: niyamai-db-sg-${self:provider.stage}
+          - Key: Environment
+            Value: ${self:provider.stage}
+
+    # VPC Endpoint for S3 (Gateway Endpoint - no charge)
+    S3VPCEndpoint:
+      Type: AWS::EC2::VPCEndpoint
+      Properties:
+        VpcId: ${env:VPC_ID, 'vpc-xxxxxxxx'}
+        ServiceName: com.amazonaws.${self:provider.region}.s3
+        VpcEndpointType: Gateway
+        RouteTableIds:
+          - ${env:PRIVATE_ROUTE_TABLE_ID, 'rtb-xxxxxxxx'}
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal: '*'
+              Action:
+                - s3:GetObject
+                - s3:PutObject
+                - s3:DeleteObject
+                - s3:ListBucket
+              Resource:
+                - arn:aws:s3:::${self:custom.documentsBucket}
+                - arn:aws:s3:::${self:custom.documentsBucket}/*
+
+    # VPC Endpoint for Textract (Interface Endpoint)
+    TextractVPCEndpoint:
+      Type: AWS::EC2::VPCEndpoint
+      Properties:
+        VpcId: ${env:VPC_ID, 'vpc-xxxxxxxx'}
+        ServiceName: com.amazonaws.${self:provider.region}.textract
+        VpcEndpointType: Interface
+        PrivateDnsEnabled: true
+        SubnetIds:
+          - ${env:PRIVATE_SUBNET_1, 'subnet-xxxxxxxx'}
+          - ${env:PRIVATE_SUBNET_2, 'subnet-yyyyyyyy'}
+        SecurityGroupIds:
+          - Ref: LambdaSecurityGroup
+
+    # VPC Endpoint for Cognito (Interface Endpoint)
+    CognitoVPCEndpoint:
+      Type: AWS::EC2::VPCEndpoint
+      Properties:
+        VpcId: ${env:VPC_ID, 'vpc-xxxxxxxx'}
+        ServiceName: com.amazonaws.${self:provider.region}.cognito-idp
+        VpcEndpointType: Interface
+        PrivateDnsEnabled: true
+        SubnetIds:
+          - ${env:PRIVATE_SUBNET_1, 'subnet-xxxxxxxx'}
+          - ${env:PRIVATE_SUBNET_2, 'subnet-yyyyyyyy'}
+        SecurityGroupIds:
+          - Ref: LambdaSecurityGroup
+
+    # Cognito User Pool
+    CognitoUserPool:
+      Type: AWS::Cognito::UserPool
+      Properties:
+        UserPoolName: niyamai-user-pool-${self:provider.stage}
+        UsernameAttributes:
+          - email
+        AutoVerifiedAttributes:
+          - email
+        EmailConfiguration:
+          EmailSendingAccount: COGNITO_DEFAULT
+        Policies:
+          PasswordPolicy:
+            MinimumLength: 8
+            RequireUppercase: true
+            RequireLowercase: true
+            RequireNumbers: true
+            RequireSymbols: true
+        Schema:
+          - Name: email
+            AttributeDataType: String
+            Required: true
+            Mutable: false
+          - Name: business_name
+            AttributeDataType: String
+            Required: false
+            Mutable: true
+        UserAttributeUpdateSettings:
+          AttributesRequireVerificationBeforeUpdate:
+            - email
+        AccountRecoverySetting:
+          RecoveryMechanisms:
+            - Name: verified_email
+              Priority: 1
+
+    # Cognito User Pool Client
+    CognitoUserPoolClient:
+      Type: AWS::Cognito::UserPoolClient
+      Properties:
+        ClientName: niyamai-client-${self:provider.stage}
+        UserPoolId:
+          Ref: CognitoUserPool
+        GenerateSecret: false
+        ExplicitAuthFlows:
+          - ALLOW_USER_PASSWORD_AUTH
+          - ALLOW_REFRESH_TOKEN_AUTH
+          - ALLOW_USER_SRP_AUTH
+        PreventUserExistenceErrors: ENABLED
+        AccessTokenValidity: 1
+        IdTokenValidity: 1
+        RefreshTokenValidity: 30
+        TokenValidityUnits:
+          AccessToken: hours
+          IdToken: hours
+          RefreshToken: days
+        ReadAttributes:
+          - email
+          - email_verified
+          - custom:business_name
+        WriteAttributes:
+          - email
+          - custom:business_name
+
+    DocumentsBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:custom.documentsBucket}
+        # Enable encryption at rest
+        BucketEncryption:
+          ServerSideEncryptionConfiguration:
+            - ServerSideEncryptionByDefault:
+                SSEAlgorithm: AES256
+              BucketKeyEnabled: true
+        # Enable versioning for data protection
+        VersioningConfiguration:
+          Status: Enabled
+        # Lifecycle policy for automatic deletion after 7 days
+        LifecycleConfiguration:
+          Rules:
+            - Id: DeleteAfter7Days
+              Status: Enabled
+              ExpirationInDays: 7
+              NoncurrentVersionExpirationInDays: 1
+        # Block all public access
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: true
+          BlockPublicPolicy: true
+          IgnorePublicAcls: true
+          RestrictPublicBuckets: true
+        # CORS configuration for frontend uploads
+        CorsConfiguration:
+          CorsRules:
+            - AllowedOrigins:
+                - '*'
+              AllowedMethods:
+                - GET
+                - PUT
+                - POST
+              AllowedHeaders:
+                - '*'
+              MaxAge: 3600
+        # Enable logging
+        LoggingConfiguration:
+          DestinationBucketName:
+            Ref: LoggingBucket
+          LogFilePrefix: s3-access-logs/
+        Tags:
+          - Key: Name
+            Value: ${self:custom.documentsBucket}
+          - Key: Environment
+            Value: ${self:provider.stage}
+
+    # S3 Bucket Policy - Enforce encryption and secure transport
+    DocumentsBucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        Bucket:
+          Ref: DocumentsBucket
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            # Deny unencrypted uploads
+            - Sid: DenyUnencryptedObjectUploads
+              Effect: Deny
+              Principal: '*'
+              Action: s3:PutObject
+              Resource: arn:aws:s3:::${self:custom.documentsBucket}/*
+              Condition:
+                StringNotEquals:
+                  's3:x-amz-server-side-encryption': 'AES256'
+            # Deny non-HTTPS requests
+            - Sid: DenyInsecureTransport
+              Effect: Deny
+              Principal: '*'
+              Action: 's3:*'
+              Resource:
+                - arn:aws:s3:::${self:custom.documentsBucket}
+                - arn:aws:s3:::${self:custom.documentsBucket}/*
+              Condition:
+                Bool:
+                  'aws:SecureTransport': false
+
+    # Logging Bucket for S3 access logs
+    LoggingBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:custom.documentsBucket}-logs
+        BucketEncryption:
+          ServerSideEncryptionConfiguration:
+            - ServerSideEncryptionByDefault:
+                SSEAlgorithm: AES256
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: true
+          BlockPublicPolicy: true
+          IgnorePublicAcls: true
+          RestrictPublicBuckets: true
+        LifecycleConfiguration:
+          Rules:
+            - Id: DeleteLogsAfter90Days
+              Status: Enabled
+              ExpirationInDays: 90
+        Tags:
+          - Key: Name
+            Value: ${self:custom.documentsBucket}-logs
+          - Key: Environment
+            Value: ${self:provider.stage}
+
+    ApiGatewayAuthorizer:
+      Type: AWS::ApiGateway::Authorizer
+      Properties:
+        Name: CognitoAuthorizer
+        Type: COGNITO_USER_POOLS
+        IdentitySource: method.request.header.Authorization
+        RestApiId:
+          Ref: ApiGatewayRestApi
+        ProviderARNs:
+          - Fn::GetAtt:
+              - CognitoUserPool
+              - Arn
+
+    # API Gateway Resource Policy - Enforce HTTPS
+    ApiGatewayResourcePolicy:
+      Type: AWS::ApiGateway::RestApi
+      Properties:
+        Name: ${self:service}-${self:provider.stage}
+        Policy:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Deny
+              Principal: '*'
+              Action: 'execute-api:Invoke'
+              Resource: 'execute-api:/*'
+              Condition:
+                Bool:
+                  'aws:SecureTransport': false
+            - Effect: Allow
+              Principal: '*'
+              Action: 'execute-api:Invoke'
+              Resource: 'execute-api:/*'
+
+    # API Gateway Stage Settings - Enable logging and tracing
+    ApiGatewayDeployment:
+      Type: AWS::ApiGateway::Deployment
+      DependsOn:
+        - ApiGatewayMethodAuthLoginPost
+        - ApiGatewayMethodAuthRegisterPost
+        - ApiGatewayMethodAuthAccountDelete
+        - ApiGatewayMethodDocumentsUploadPost
+        - ApiGatewayMethodDocumentsProcessOcrPost
+        - ApiGatewayMethodAnalyzeContractPost
+        - ApiGatewayMethodAnalyzeInvoicePost
+        - ApiGatewayMethodAnalyzeSecurityPost
+        - ApiGatewayMethodDashboardGet
+        - ApiGatewayMethodReportsGeneratePost
+      Properties:
+        RestApiId:
+          Ref: ApiGatewayRestApi
+        StageName: ${self:provider.stage}
+        StageDescription:
+          TracingEnabled: true
+          LoggingLevel: INFO
+          DataTraceEnabled: true
+          MetricsEnabled: true
+          ThrottlingBurstLimit: 5000
+          ThrottlingRateLimit: 10000
+
+    # CloudWatch Log Group for API Gateway
+    ApiGatewayLogGroup:
+      Type: AWS::Logs::LogGroup
+      Properties:
+        LogGroupName: /aws/apigateway/${self:service}-${self:provider.stage}
+        RetentionInDays: 30
+
+  Outputs:
+    CognitoUserPoolId:
+      Description: Cognito User Pool ID
+      Value:
+        Ref: CognitoUserPool
+      Export:
+        Name: ${self:provider.stage}-CognitoUserPoolId
+    
+    CognitoUserPoolClientId:
+      Description: Cognito User Pool Client ID
+      Value:
+        Ref: CognitoUserPoolClient
+      Export:
+        Name: ${self:provider.stage}-CognitoUserPoolClientId
+    
+    CognitoUserPoolArn:
+      Description: Cognito User Pool ARN
+      Value:
+        Fn::GetAtt:
+          - CognitoUserPool
+          - Arn
+      Export:
+        Name: ${self:provider.stage}-CognitoUserPoolArn
+    
+    DocumentsBucketName:
+      Description: S3 Bucket for document storage
+      Value:
+        Ref: DocumentsBucket
+      Export:
+        Name: ${self:provider.stage}-DocumentsBucket
+    
+    LambdaSecurityGroupId:
+      Description: Security Group ID for Lambda functions
+      Value:
+        Ref: LambdaSecurityGroup
+      Export:
+        Name: ${self:provider.stage}-LambdaSecurityGroup
+    
+    DatabaseSecurityGroupId:
+      Description: Security Group ID for RDS database
+      Value:
+        Ref: DatabaseSecurityGroup
+      Export:
+        Name: ${self:provider.stage}-DatabaseSecurityGroup
+    
+    ApiGatewayUrl:
+      Description: API Gateway endpoint URL
+      Value:
+        Fn::Sub: 'https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/${self:provider.stage}'
+      Export:
+        Name: ${self:provider.stage}-ApiGatewayUrl
+
+plugins:
+  - serverless-offline

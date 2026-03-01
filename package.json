@@ -1,0 +1,42 @@
+{
+    "name": "niyamai-risk-checker",
+    "version": "0.1.0",
+    "private": true,
+    "scripts": {
+        "dev": "next dev",
+        "build": "next build",
+        "start": "next start",
+        "lint": "next lint",
+        "test": "vitest --run",
+        "test:watch": "vitest"
+    },
+    "dependencies": {
+        "next": "^14.2.0",
+        "react": "^18.3.0",
+        "react-dom": "^18.3.0",
+        "aws-sdk": "^2.1691.0",
+        "@aws-sdk/client-s3": "^3.699.0",
+        "@aws-sdk/client-textract": "^3.699.0",
+        "@aws-sdk/client-cognito-identity-provider": "^3.699.0",
+        "@aws-sdk/s3-request-presigner": "^3.699.0",
+        "aws-amplify": "^6.11.0",
+        "pdfkit": "^0.15.0",
+        "pg": "^8.13.1"
+    },
+    "devDependencies": {
+        "@types/node": "^22.10.2",
+        "@types/react": "^18.3.0",
+        "@types/react-dom": "^18.3.0",
+        "@types/pdfkit": "^0.13.5",
+        "@types/pg": "^8.11.10",
+        "typescript": "^5.7.2",
+        "eslint": "^8.57.0",
+        "eslint-config-next": "^14.2.0",
+        "fast-check": "^3.22.0",
+        "vitest": "^2.1.8",
+        "@vitejs/plugin-react": "^4.3.4",
+        "tailwindcss": "^3.4.17",
+        "postcss": "^8.4.49",
+        "autoprefixer": "^10.4.20"
+    }
+}

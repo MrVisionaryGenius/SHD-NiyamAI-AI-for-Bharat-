@@ -1,0 +1,458 @@
+{
+    "info": {
+        "name": "NiyamAI Risk Checker API",
+        "description": "API collection for testing NiyamAI Risk Checker endpoints",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "variable": [
+        {
+            "key": "base_url",
+            "value": "https://your-api-id.execute-api.us-east-1.amazonaws.com/dev",
+            "type": "string"
+        },
+        {
+            "key": "access_token",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "document_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "assessment_id",
+            "value": "",
+            "type": "string"
+        }
+    ],
+    "item": [
+        {
+            "name": "Authentication",
+            "item": [
+                {
+                    "name": "Register User",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 201) {",
+                                    "    const response = pm.response.json();",
+                                    "    pm.environment.set('user_id', response.id);",
+                                    "    console.log('User registered:', response.email);",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"TestPassword123!\",\n  \"businessName\": \"Test Business\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/auth/register",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "auth",
+                                "register"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Login User",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 200) {",
+                                    "    const response = pm.response.json();",
+                                    "    pm.collectionVariables.set('access_token', response.token);",
+                                    "    console.log('Login successful, token saved');",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"TestPassword123!\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/auth/login",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "auth",
+                                "login"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Delete Account",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{access_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/auth/account",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "auth",
+                                "account"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Document Upload",
+            "item": [
+                {
+                    "name": "Upload Contract",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 200) {",
+                                    "    const response = pm.response.json();",
+                                    "    pm.collectionVariables.set('document_id', response.documentId);",
+                                    "    pm.collectionVariables.set('upload_url', response.uploadUrl);",
+                                    "    console.log('Document ID:', response.documentId);",
+                                    "    console.log('Upload URL:', response.uploadUrl);",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{access_token}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"filename\": \"test-contract.pdf\",\n  \"fileSize\": 102400,\n  \"contentType\": \"application/pdf\",\n  \"documentType\": \"contract\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/documents/upload",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "documents",
+                                "upload"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Upload Invoice",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 200) {",
+                                    "    const response = pm.response.json();",
+                                    "    pm.collectionVariables.set('invoice_document_id', response.documentId);",
+                                    "    console.log('Invoice Document ID:', response.documentId);",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{access_token}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"filename\": \"test-invoice.pdf\",\n  \"fileSize\": 51200,\n  \"contentType\": \"application/pdf\",\n  \"documentType\": \"invoice\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/documents/upload",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "documents",
+                                "upload"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Process OCR",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{access_token}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"documentId\": \"{{document_id}}\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/documents/process-ocr",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "documents",
+                                "process-ocr"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Analysis",
+            "item": [
+                {
+                    "name": "Analyze Contract",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 200) {",
+                                    "    const response = pm.response.json();",
+                                    "    pm.collectionVariables.set('assessment_id', response.assessmentId);",
+                                    "    console.log('Assessment ID:', response.assessmentId);",
+                                    "    console.log('Risk Score:', response.riskScore);",
+                                    "    console.log('Severity:', response.severity);",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{access_token}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"documentId\": \"{{document_id}}\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/analyze/contract",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "analyze",
+                                "contract"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Analyze Invoice",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 200) {",
+                                    "    const response = pm.response.json();",
+                                    "    pm.collectionVariables.set('invoice_assessment_id', response.assessmentId);",
+                                    "    console.log('Invoice Assessment ID:', response.assessmentId);",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{access_token}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"documentId\": \"{{invoice_document_id}}\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/analyze/invoice",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "analyze",
+                                "invoice"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Security Questionnaire",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 200) {",
+                                    "    const response = pm.response.json();",
+                                    "    pm.collectionVariables.set('security_assessment_id', response.assessmentId);",
+                                    "    console.log('Security Assessment ID:', response.assessmentId);",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{access_token}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"responses\": [\n    {\"questionId\": \"pwd_policy\", \"response\": \"manager\"},\n    {\"questionId\": \"mfa_usage\", \"response\": \"all\"},\n    {\"questionId\": \"device_security\", \"response\": \"all\"},\n    {\"questionId\": \"software_updates\", \"response\": \"auto\"},\n    {\"questionId\": \"data_backup\", \"response\": \"auto_cloud\"},\n    {\"questionId\": \"data_sharing\", \"response\": \"secure\"},\n    {\"questionId\": \"access_control\", \"response\": \"managed\"},\n    {\"questionId\": \"wifi_security\", \"response\": \"secure\"}\n  ]\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/analyze/security",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "analyze",
+                                "security"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Dashboard & Reports",
+            "item": [
+                {
+                    "name": "Get Dashboard",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{access_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/dashboard",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "dashboard"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Generate Report",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{access_token}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"assessmentIds\": [\"{{assessment_id}}\"]\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/reports/generate",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "reports",
+                                "generate"
+                            ]
+                        }
+                    }
+                }
+            ]
+        }
+    ]
+}

@@ -1,0 +1,33 @@
+{
+    "name": "niyamai-backend",
+    "version": "1.0.0",
+    "description": "NiyamAI Risk Checker Backend Lambda Functions",
+    "main": "index.js",
+    "scripts": {
+        "deploy": "serverless deploy",
+        "deploy:dev": "serverless deploy --stage dev",
+        "deploy:prod": "serverless deploy --stage prod",
+        "remove": "serverless remove",
+        "logs": "serverless logs -f",
+        "offline": "serverless offline"
+    },
+    "dependencies": {
+        "@aws-sdk/client-s3": "^3.699.0",
+        "@aws-sdk/client-textract": "^3.699.0",
+        "@aws-sdk/client-cognito-identity-provider": "^3.699.0",
+        "@aws-sdk/s3-request-presigner": "^3.699.0",
+        "pg": "^8.13.1",
+        "pdfkit": "^0.15.0",
+        "uuid": "^11.0.3"
+    },
+    "devDependencies": {
+        "@types/aws-lambda": "^8.10.145",
+        "@types/node": "^22.10.2",
+        "@types/pg": "^8.11.10",
+        "@types/pdfkit": "^0.13.5",
+        "@types/uuid": "^10.0.0",
+        "serverless": "^3.39.0",
+        "serverless-offline": "^13.8.1",
+        "typescript": "^5.7.2"
+    }
+}
